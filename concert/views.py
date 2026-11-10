@@ -1,4 +1,8 @@
-from django.contrib.auth import login, logout
+from django.contrib.auth import login, logout, authenticate
+from django.conf import settings
+from django.db import IntegrityError
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import get_object_or_404
@@ -14,7 +18,16 @@ import requests as req
 # Create your views here.
 
 def signup(request):
-    pass
+    form = SignUpForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        try:
+            validate_password(form.cleaned_data['password'])
+            user = User.objects.create_user(username=form.cleaned_data['username'], password=form.cleaned_data['password'])
+            login(request, user)
+            return HttpResponseRedirect(reverse('index'))
+        except (IntegrityError, ValidationError):
+            form.add_error(None, 'Choose a unique username and a valid password.')
+    return render(request, 'signup.html', {'form': form})
 
 
 def index(request):
@@ -22,29 +35,51 @@ def index(request):
 
 
 def songs(request):
-    # songs = {"songs":[]}
-    # return render(request, "songs.html", {"songs": [insert list here]})
-    pass
+    try:
+        response = req.get(settings.SONGS_SERVICE_URL + '/song', timeout=5)
+        response.raise_for_status()
+        data = response.json()['songs']
+    except (req.RequestException, ValueError, KeyError):
+        return render(request, 'songs.html', {'songs': [], 'service_error': 'The songs service is temporarily unavailable.'}, status=503)
+    return render(request, 'songs.html', {'songs': data})
 
 
 def photos(request):
-    # photos = []
-    # return render(request, "photos.html", {"photos": photos})
-    pass
+    try:
+        response = req.get(settings.PICTURES_SERVICE_URL + '/picture', timeout=5)
+        response.raise_for_status()
+        data = response.json()
+    except (req.RequestException, ValueError):
+        return render(request, 'photos.html', {'photos': [], 'service_error': 'The pictures service is temporarily unavailable.'}, status=503)
+    return render(request, 'photos.html', {'photos': data})
+
 
 def login_view(request):
-    pass
+    form = LoginForm(request, data=request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        login(request, form.get_user())
+        return HttpResponseRedirect(reverse('index'))
+    return render(request, 'login.html', {'form': form})
+
 
 def logout_view(request):
-    pass
+    logout(request)
+    return HttpResponseRedirect(reverse('login'))
+
 
 def concerts(request):
-    pass
+    if not request.user.is_authenticated:
+        return HttpResponseRedirect(reverse('login'))
+    items = []
+    for concert in Concert.objects.all().order_by('date'):
+        attending = concert.attendee.filter(user=request.user).first()
+        items.append({'concert': concert, 'status': attending.attending if attending else '-'})
+    return render(request, 'concerts.html', {'concerts': items})
 
 
 def concert_detail(request, id):
     if request.user.is_authenticated:
-        obj = Concert.objects.get(pk=id)
+        obj = get_object_or_404(Concert, pk=id)
         try:
             status = obj.attendee.filter(user=request.user).first().attending
         except:

@@ -1,4 +1,4 @@
-{% extends "base.html" %} {% load static %} {% block content %}
+{% extends "base.html" %} {% load static %} {% block content %}{% if service_error %}<div role="alert">{{ service_error }}</div>{% endif %}
 <div class="container">
   <div class="row">
     {% for photo in photos %}
