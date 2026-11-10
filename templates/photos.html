@@ -1,5 +1,7 @@
 {% extends "base.html" %} {% load static %} {% block content %}{% if service_error %}<div role="alert">{{ service_error }}</div>{% endif %}
 <div class="container">
+  <h1>Photos</h1>
+  {% if single_photo %}<p><a href="/photos">View all photos</a></p>{% endif %}
   <div class="row">
     {% for photo in photos %}
     <div class="col-lg-4 col-md-6 d-flex align-items-stretch py-3 mb-3">
@@ -10,6 +12,7 @@
           <p class="card-text mb-4">
             {{ photo.event_city }}, {{ photo.event_state }}
           </p>
+          {% if not single_photo %}<a href="/photos?id={{ photo.id }}">View photo</a>{% endif %}
         </div>
       </div>
     </div>

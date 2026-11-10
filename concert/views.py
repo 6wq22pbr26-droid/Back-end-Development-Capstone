@@ -4,7 +4,7 @@ from django.db import IntegrityError
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User
-from django.http import HttpResponseRedirect, HttpResponse
+from django.http import HttpResponseRedirect, HttpResponse, Http404
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render
 from django.urls import reverse
@@ -51,7 +51,15 @@ def photos(request):
         data = response.json()
     except (req.RequestException, ValueError):
         return render(request, 'photos.html', {'photos': [], 'service_error': 'The pictures service is temporarily unavailable.'}, status=503)
-    return render(request, 'photos.html', {'photos': data})
+    photo_id = request.GET.get('id')
+    if photo_id is not None:
+        try:
+            data = [photo for photo in data if photo['id'] == int(photo_id)]
+        except ValueError:
+            raise Http404('Invalid photo identifier')
+        if not data:
+            raise Http404('Photo not found')
+    return render(request, 'photos.html', {'photos': data, 'single_photo': photo_id is not None})
 
 
 def login_view(request):
